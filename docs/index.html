@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Stack n Stock CRM V2</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="toast" class="toast" role="status"></div>
+
+  <aside class="rail" aria-label="Primary Navigation">
+    <div class="logo-wrap">
+      <img src="assets/stacknstock-logo.png" alt="Stack n Stock">
+    </div>
+    <nav class="rail-nav">
+      <button class="rail-btn active" data-view="dashboard"><span>DB</span>Dashboard</button>
+      <button class="rail-btn" data-view="accounts"><span>AC</span>Accounts</button>
+      <button class="rail-btn" data-view="pipeline"><span>PL</span>Pipeline</button>
+      <button class="rail-btn" data-view="tasks"><span>TS</span>Tasks</button>
+      <button class="rail-btn" data-view="competitors"><span>CP</span>Competitors</button>
+      <button class="rail-btn" data-view="settings"><span>ST</span>Setup</button>
+    </nav>
+    <div class="status-card">
+      <div class="status-dot" id="statusDot"></div>
+      <div>
+        <strong id="statusTitle">Starting</strong>
+        <small id="statusText">Preparing dashboard</small>
+      </div>
+    </div>
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="title-block">
+        <p class="eyebrow">Stack n Stock CRM V2</p>
+        <h1 id="pageTitle">Operational Command Center</h1>
+      </div>
+      <div class="actions">
+        <label class="search">
+          <span>SR</span>
+          <input id="searchInput" type="search" placeholder="Search account, owner, city, contact, notes">
+        </label>
+        <button class="btn ghost" id="refreshBtn" type="button">Refresh</button>
+        <button class="btn ghost" id="exportBtn" type="button">Export Accounts CSV</button>
+        <button class="btn ghost" id="exportOverlapBtn" type="button">Export Overlap CSV</button>
+        <button class="btn primary" id="newBtn" type="button">New Account</button>
+      </div>
+    </header>
+
+    <section class="hero view" data-panel="dashboard">
+      <div class="hero-copy">
+        <p class="eyebrow yellow">Revenue Intelligence</p>
+        <h2>Track Q-commerce demand, competitor overlap, and pilot readiness.</h2>
+        <p>Monitor accounts, weighted MRR, follow-ups, and overlap risk in one live control surface synced with Supabase.</p>
+      </div>
+      <div class="hero-stats">
+        <span class="label">Today focus</span>
+        <strong id="todayFocus">0</strong>
+        <small>open tasks</small>
+      </div>
+    </section>
+
+    <section class="kpis view" data-panel="dashboard" id="kpiGrid"></section>
+
+    <section class="grid-two view" data-panel="dashboard">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Pipeline</p>
+            <h3>Stage Distribution</h3>
+          </div>
+          <select id="stageQuickFilter" class="select">
+            <option value="all">All stages</option>
+            <option value="Prospecting">Prospecting</option>
+            <option value="Lead Generation">Lead Generation</option>
+            <option value="Fit Score Eligible">Fit Score Eligible</option>
+            <option value="Proposal">Proposal</option>
+            <option value="commercialization">commercialization</option>
+            <option value="LOI/ Pilot">LOI/ Pilot</option>
+            <option value="WON">WON</option>
+            <option value="Lost">Lost</option>
+          </select>
+        </div>
+        <div class="stage-bars" id="stageBars"></div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">Forecast</p>
+            <h3>Weighted Pipeline</h3>
+          </div>
+        </div>
+        <div class="forecast" id="forecastChart"></div>
+      </article>
+    </section>
+
+    <section class="table-card view" data-panel="dashboard accounts">
+      <div class="table-head">
+        <div>
+          <p class="eyebrow">CRM Records</p>
+          <h3>Active Accounts</h3>
+        </div>
+        <div class="filters">
+          <select id="ownerFilter" class="select"><option value="all">All owners</option></select>
+          <select id="stageFilter" class="select"><option value="all">All stages</option></select>
+          <select id="tierFilter" class="select">
+            <option value="all">All tiers</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+          </select>
+          <select id="actionFilter" class="select">
+            <option value="all">All actions</option>
+            <option value="Approach now">Approach now</option>
+            <option value="Approach week later">Approach week later</option>
+            <option value="Shortlist">Shortlist</option>
+            <option value="Validate">Validate</option>
+          </select>
+          <select id="channelFilter" class="select"><option value="all">All channels</option></select>
+          <select id="overlapFilter" class="select">
+            <option value="all">All overlap</option>
+            <option value="risk">With competitors</option>
+            <option value="clear">Clear runway</option>
+          </select>
+          <select id="sortSelect" class="select">
+            <option value="qc_score">Score high to low</option>
+            <option value="deal_value">Value high to low</option>
+            <option value="weighted_mrr">Weighted MRR high to low</option>
+            <option value="next_action_at">Next action date</option>
+            <option value="name">Account A-Z</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Stage</th>
+              <th>Tier / Action</th>
+              <th>Channels</th>
+              <th>Demand</th>
+              <th>Competitors</th>
+              <th>Value / MRR</th>
+              <th>Score</th>
+              <th>Next Action</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="accountRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view hidden" data-panel="pipeline">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Pipeline Board</p>
+          <h2>Opportunities by stage</h2>
+        </div>
+        <div class="filters">
+          <select id="pipelineOwnerFilter" class="select"><option value="all">All owners</option></select>
+          <select id="pipelineTierFilter" class="select">
+            <option value="all">All tiers</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+          </select>
+          <select id="pipelineOverlapFilter" class="select">
+            <option value="all">All overlap</option>
+            <option value="risk">With competitors</option>
+            <option value="clear">Clear runway</option>
+          </select>
+        </div>
+      </div>
+      <div class="pipeline-board" id="pipelineBoard"></div>
+    </section>
+
+    <section class="view hidden" data-panel="tasks">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Action Desk</p>
+          <h2>Alerts, follow-ups, and reminders</h2>
+        </div>
+      </div>
+      <div class="task-list" id="taskList"></div>
+    </section>
+
+    <section class="view hidden" data-panel="competitors">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Competitor Intel</p>
+          <h2>Coverage, overlap, and market share</h2>
+        </div>
+        <div class="filters">
+          <button class="btn ghost" id="exportCompetitorsBtn" type="button">Export Competitors CSV</button>
+          <button class="btn primary" id="newCompetitorBtn" type="button">New Competitor</button>
+        </div>
+      </div>
+
+      <article class="card competitor-grid">
+        <div class="card-head"><h3>Competitor List</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Market Share</th>
+                <th>Accounts Served</th>
+                <th>Channels</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="competitorRows"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h3>Competitor Market Share</h3></div>
+        <div id="competitorChart" class="market-chart"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h3>Overlap Matrix</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr id="matrixHead"></tr>
+            </thead>
+            <tbody id="matrixBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="setup view hidden" data-panel="settings">
+      <article class="card setup-card">
+        <p class="eyebrow">Supabase Setup</p>
+        <h2>Connect and sync dynamically</h2>
+        <ol>
+          <li>Run <code>supabase_schema.sql</code> in Supabase SQL Editor.</li>
+          <li>Set keys in <code>js/config.js</code>.</li>
+          <li>Optionally seed with <code>scripts/sync_excel.ps1</code>.</li>
+        </ol>
+        <p class="muted">Final V1 is operational in local mode immediately. When Supabase is enabled, create/update/delete operations write directly to Supabase and refresh in realtime.</p>
+        <button class="btn ghost" id="resetLocalBtn" type="button">Reset Local Demo Data</button>
+      </article>
+    </section>
+  </main>
+
+  <dialog id="accountDialog" class="modal">
+    <form id="accountForm">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">CRM Account</p>
+          <h3 id="modalTitle">New Account</h3>
+        </div>
+        <button type="button" class="icon" id="closeModal">X</button>
+      </div>
+
+      <input type="hidden" id="account_id">
+
+      <div id="competitorAlertBanner" class="alert-banner hidden"></div>
+
+      <div class="tab-strip" id="accountTabStrip">
+        <button type="button" class="tab-btn active" data-tab="overview">Overview</button>
+        <button type="button" class="tab-btn" data-tab="market">Market Intel</button>
+        <button type="button" class="tab-btn" data-tab="followups">Follow-ups</button>
+        <button type="button" class="tab-btn" data-tab="competitor">Competitor Intel</button>
+        <button type="button" class="tab-btn" data-tab="commercial">Commercial</button>
+      </div>
+
+      <section class="tab-panel active" data-tab="overview">
+        <div class="form-grid">
+          <label>Account name<input id="name" required></label>
+          <label>Company type<input id="company_type"></label>
+          <label>Contact name<input id="contact_name"></label>
+          <label>Email<input id="contact_email" type="email"></label>
+          <label>Phone<input id="contact_phone"></label>
+          <label>Owner<input id="owner"></label>
+          <label>City<input id="city"></label>
+          <label>Stage
+            <select id="stage">
+              <option>Prospecting</option>
+              <option>Lead Generation</option>
+              <option>Fit Score Eligible</option>
+              <option>Proposal</option>
+              <option>commercialization</option>
+              <option>LOI/ Pilot</option>
+              <option>WON</option>
+              <option>Lost</option>
+            </select>
+          </label>
+          <label>Probability %
+            <input id="probability" type="number" min="0" max="100">
+          </label>
+          <label>Next action date<input id="next_action_at" type="date"></label>
+          <label class="span-2">Next action<input id="next_action"></label>
+          <label class="span-2">Notes<textarea id="notes" rows="3"></textarea></label>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab="market">
+        <div class="form-grid">
+          <label>Priority tier
+            <select id="priority_tier">
+              <option value="P0">P0 Cash Cow</option>
+              <option value="P1">P1 Easy Pilot</option>
+              <option value="P2">P2 Strategic</option>
+              <option value="P3">P3 Later</option>
+            </select>
+          </label>
+          <label>Action
+            <select id="action">
+              <option>Approach week later</option>
+              <option>Approach now</option>
+              <option>Shortlist</option>
+              <option>Validate</option>
+            </select>
+          </label>
+          <label>Demand low / day<input id="demand_low" type="number" min="0"></label>
+          <label>Demand high / day<input id="demand_high" type="number" min="0"></label>
+          <label class="span-2">Channels (comma separated)<input id="channels_input" placeholder="Blinkit, Zepto, Instamart"></label>
+          <label class="span-2">Channel share note<input id="channel_share_note" placeholder="Blinkit 40%, Zepto 30%, D2C 30%"></label>
+
+          <label>QC urgency (1-5)<input id="score_qc_urgency" type="range" min="1" max="5" step="1"></label>
+          <label>SKU fit (1-5)<input id="score_sku_fit" type="range" min="1" max="5" step="1"></label>
+          <label>Order density (1-5)<input id="score_order_density" type="range" min="1" max="5" step="1"></label>
+          <label>Pilot willing (1-5)<input id="score_pilot_willing" type="range" min="1" max="5" step="1"></label>
+          <label>Accessibility (1-5)<input id="score_accessibility" type="range" min="1" max="5" step="1"></label>
+          <label>Logo value (1-5)<input id="score_logo_value" type="range" min="1" max="5" step="1"></label>
+        </div>
+        <div class="score-box">
+          <div>
+            <strong id="qcScorePreview">0</strong>
+            <small>QC Score</small>
+          </div>
+          <button type="button" class="btn ghost small" id="showScoreBreakdownBtn">Score breakdown</button>
+        </div>
+        <div id="scoreBreakdownPanel" class="score-breakdown hidden"></div>
+      </section>
+
+      <section class="tab-panel" data-tab="followups">
+        <div class="form-grid">
+          <label>FU1 Date<input id="fu1_date" type="date"></label>
+          <label>FU1 Contact<input id="fu1_contact"></label>
+          <label>FU1 Mode
+            <select id="fu1_mode">
+              <option>Call</option>
+              <option>Email</option>
+              <option>WhatsApp</option>
+              <option>LinkedIn</option>
+              <option>In-Person</option>
+            </select>
+          </label>
+          <label>FU1 Status
+            <select id="fu1_status">
+              <option>Pending</option>
+              <option>Done</option>
+              <option>No Response</option>
+              <option>Rescheduled</option>
+            </select>
+          </label>
+          <label class="span-2">FU1 Summary<textarea id="fu1_note" rows="2"></textarea></label>
+
+          <label>FU2 Date<input id="fu2_date" type="date"></label>
+          <label>FU2 Contact<input id="fu2_contact"></label>
+          <label>FU2 Mode
+            <select id="fu2_mode">
+              <option>Email</option>
+              <option>Call</option>
+              <option>WhatsApp</option>
+              <option>LinkedIn</option>
+              <option>In-Person</option>
+            </select>
+          </label>
+          <label>FU2 Status
+            <select id="fu2_status">
+              <option>Pending</option>
+              <option>Done</option>
+              <option>No Response</option>
+              <option>Rescheduled</option>
+            </select>
+          </label>
+          <label class="span-2">FU2 Summary<textarea id="fu2_note" rows="2"></textarea></label>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab="competitor">
+        <div class="form-grid">
+          <label class="span-2">Competitors serving
+            <select id="competitors_serving" multiple size="5"></select>
+          </label>
+          <label class="span-2">Competitor wallet share<textarea id="competitor_wallet_share" rows="2" placeholder="Delhivery 60%, Xpressbees 40%"></textarea></label>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab="commercial">
+        <div class="form-grid">
+          <label>Deal value<input id="deal_value" type="number" min="0" step="1000"></label>
+          <label>Bin slots<input id="bin_slots" type="number" min="0"></label>
+          <label>Price per bin<input id="price_per_bin" type="number" min="0" step="100"></label>
+          <label>Weighted MRR<input id="weighted_mrr" type="number" min="0" readonly></label>
+          <label>Next follow-up date<input id="next_followup_date" type="date"></label>
+          <label>Last contact date<input id="last_contact_at" type="date"></label>
+          <label class="span-2">Commercial ask<textarea id="commercial_ask" rows="2"></textarea></label>
+          <label class="span-2">Risks / blockers<textarea id="risks" rows="2"></textarea></label>
+        </div>
+      </section>
+
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="deleteBtn">Delete</button>
+        <span></span>
+        <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn primary" id="saveBtn">Save Account</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="competitorDialog" class="modal">
+    <form id="competitorForm">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Competitor</p>
+          <h3 id="competitorModalTitle">New Competitor</h3>
+        </div>
+        <button type="button" class="icon" id="closeCompetitorModal">X</button>
+      </div>
+
+      <input type="hidden" id="competitor_id">
+
+      <div class="form-grid">
+        <label>Name<input id="comp_name" required></label>
+        <label>Category<input id="comp_category"></label>
+        <label>Market share %<input id="comp_market_share_pct" type="number" min="0" max="100" step="0.01"></label>
+        <label>Channels (comma separated)<input id="comp_channels"></label>
+        <label class="span-2">Customers served
+          <select id="comp_customers_served" multiple size="6"></select>
+        </label>
+        <label class="span-2">Strengths<textarea id="comp_strengths" rows="2"></textarea></label>
+        <label class="span-2">Weaknesses<textarea id="comp_weaknesses" rows="2"></textarea></label>
+        <label class="span-2">Pricing model<textarea id="comp_pricing_model" rows="2"></textarea></label>
+        <label class="span-2">Notes<textarea id="comp_notes" rows="2"></textarea></label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="deleteCompetitorBtn">Delete</button>
+        <span></span>
+        <button type="button" class="btn ghost" id="cancelCompetitorBtn">Cancel</button>
+        <button type="submit" class="btn primary" id="saveCompetitorBtn">Save Competitor</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/config.js?v=20260601b"></script>
+  <script src="js/seed-data.js?v=20260601b"></script>
+  <script src="js/scoring.js?v=20260601b"></script>
+  <script src="js/alerts.js?v=20260601b"></script>
+  <script src="js/competitors.js?v=20260601b"></script>
+  <script src="js/exporters.js?v=20260601b"></script>
+  <script src="js/app.js?v=20260601b"></script>
+</body>
+</html>
