@@ -194,6 +194,14 @@ function stageClass(stage) {
   return `stage-${slug || "unknown"}`;
 }
 
+function ensureStageDropdown(value = "Prospecting") {
+  const stageInput = $("stage");
+  if (!stageInput) return;
+  const normalized = normalizeStage(value);
+  stageInput.innerHTML = stages.map((s) => `<option value="${s}">${s}</option>`).join("");
+  stageInput.value = stages.includes(normalized) ? normalized : "Prospecting";
+}
+
 function normalizeChannels(raw) {
   const arr = parseJsonArray(raw);
   if (!arr.length) return [];
@@ -451,10 +459,7 @@ function renderFilters() {
     stageQuickSelect.innerHTML = `<option value="all">All stages</option>${stages.map((s) => `<option value="${s}">${s}</option>`).join("")}`;
     stageQuickSelect.value = stages.includes(currentQuickStage) ? currentQuickStage : "all";
   }
-  if (stageInput) {
-    stageInput.innerHTML = stages.map((s) => `<option value="${s}">${s}</option>`).join("");
-    stageInput.value = stages.includes(currentInputStage) ? currentInputStage : "Prospecting";
-  }
+  if (stageInput) ensureStageDropdown(currentInputStage);
 
   const channelNames = [
     ...new Set([
@@ -866,7 +871,7 @@ function clearAccountForm() {
   });
 
   $("city").value = "Bangalore";
-  $("stage").value = "Prospecting";
+  ensureStageDropdown("Prospecting");
   $("probability").value = String(stageProbability.Prospecting);
   $("priority_tier").value = "P2";
   $("action").value = "Shortlist";
@@ -960,7 +965,7 @@ function fillAccountForm(record) {
   $("owner").value = record.owner || "";
   $("city").value = record.city || "";
   const stage = normalizeStage(record.stage);
-  $("stage").value = stages.includes(stage) ? stage : "Prospecting";
+  ensureStageDropdown(stage);
   $("probability").value = String(record.probability ?? "");
   $("next_action_at").value = record.next_action_at || "";
   $("next_action").value = record.next_action || "";
