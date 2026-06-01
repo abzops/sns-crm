@@ -572,7 +572,7 @@ function renderPipeline() {
             return `<article class="deal-card" draggable="true" data-account-id="${a.id}">
               <strong><span class="tier-strip strip-${String(a.priority_tier || "P2").toLowerCase()}"></span>${escapeHtml(a.name)}</strong>
               <small>${escapeHtml(a.owner || "Unassigned")} | ${escapeHtml(a.next_action || "No next action")}</small>
-              <div class="deal-meta"><span>${shortMoney(a.deal_value)}</span><span>MRR ${shortMoney(a.weighted_mrr || 0)}</span></div>
+              <div class="deal-meta"><span>${shortMoney(a.deal_value)}</span></div>
               ${risk ? `<span class="risk-badge warn">Risk</span>` : `<span class="risk-badge clear">Clear</span>`}
             </article>`;
           })
