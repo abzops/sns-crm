@@ -14,7 +14,7 @@ create table if not exists public.crm_accounts (
   contact_phone text,
   owner text,
   city text default 'Bangalore',
-  stage text not null default 'Prospecting' check (stage in ('Prospecting','Qualified','Proposal','Pilot','Won','Lost')),
+  stage text not null default 'Prospecting' check (stage in ('Prospecting','Lead Generation','Fit Score Eligible','Proposal','commercialization','LOI/ Pilot','WON','Lost')),
   deal_value numeric not null default 0,
   probability integer not null default 15 check (probability >= 0 and probability <= 100),
   score integer not null default 70 check (score >= 0 and score <= 100),
@@ -91,6 +91,48 @@ alter table public.crm_accounts add column if not exists commercial_ask text;
 alter table public.crm_accounts add column if not exists risks text;
 alter table public.crm_accounts add column if not exists score_basis text;
 alter table public.crm_accounts add column if not exists last_contact_at date;
+
+do $$
+declare c record;
+begin
+  for c in
+    select conname
+    from pg_constraint
+    where conrelid = 'public.crm_accounts'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%stage%'
+  loop
+    execute format('alter table public.crm_accounts drop constraint if exists %I', c.conname);
+  end loop;
+end $$;
+
+update public.crm_accounts
+set stage = case
+  when stage = 'Qualified' then 'Lead Generation'
+  when stage = 'Pilot' then 'LOI/ Pilot'
+  when stage = 'Won' then 'WON'
+  when stage = 'Fit Score' then 'Fit Score Eligible'
+  when lower(stage) = 'commercialisation' then 'commercialization'
+  when lower(stage) = 'commercialization' then 'commercialization'
+  else stage
+end;
+
+update public.crm_accounts
+set stage = 'Prospecting'
+where stage is null
+  or stage not in ('Prospecting','Lead Generation','Fit Score Eligible','Proposal','commercialization','LOI/ Pilot','WON','Lost');
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'crm_accounts_stage_chk'
+  ) then
+    alter table public.crm_accounts
+      add constraint crm_accounts_stage_chk
+      check (stage in ('Prospecting','Lead Generation','Fit Score Eligible','Proposal','commercialization','LOI/ Pilot','WON','Lost'));
+  end if;
+end $$;
 
 do $$
 begin
@@ -245,9 +287,9 @@ on conflict (name) do nothing;
 insert into public.crm_accounts
 (name, company_type, contact_name, contact_email, contact_phone, owner, city, stage, deal_value, probability, score, next_action_at, next_action, notes)
 values
-('Haldiram Bangalore','Packaged Food / Snacks','Regional Distributor','ops@haldiram.example','+91 90000 10001','Abhinand','Bangalore','Pilot',850000,75,94,current_date + 1,'Confirm pilot SKU list','Anchor snack VMI pilot for fast-moving SKUs.'),
+('Haldiram Bangalore','Packaged Food / Snacks','Regional Distributor','ops@haldiram.example','+91 90000 10001','Abhinand','Bangalore','LOI/ Pilot',850000,75,94,current_date + 1,'Confirm pilot SKU list','Anchor snack VMI pilot for fast-moving SKUs.'),
 ('Himalaya Wellness','Wellness / Personal Care','Supply Chain Lead','supply@himalaya.example','+91 90000 10002','Abhinand','Bangalore','Proposal',620000,55,88,current_date + 3,'Send layout and pricing note','Compact wellness SKU pilot.'),
-('ITC Foods Distributor','FMCG Distributor','Modern Trade Contact','trade@itc.example','+91 90000 10006','Ops','Bangalore','Won',1250000,100,91,current_date,'Kickoff data collection','Confirmed for discovery pilot.'),
-('Supertails','Pet Care','Business Head','partners@supertails.example','+91 90000 10003','Sales','Bangalore','Qualified',420000,30,81,current_date + 5,'Qualify compact SKU list','Pet essentials only, exclude bulky bags.'),
+('ITC Foods Distributor','FMCG Distributor','Modern Trade Contact','trade@itc.example','+91 90000 10006','Ops','Bangalore','WON',1250000,100,91,current_date,'Kickoff data collection','Confirmed for discovery pilot.'),
+('Supertails','Pet Care','Business Head','partners@supertails.example','+91 90000 10003','Sales','Bangalore','Lead Generation',420000,30,81,current_date + 5,'Qualify compact SKU list','Pet essentials only, exclude bulky bags.'),
 ('Purplle Marketplace Sellers','Beauty Marketplace','Marketplace Ops','marketplace@purplle.example','+91 90000 10005','Abhinand','Bangalore','Proposal',1100000,55,86,current_date + 2,'Present seller pool model','100-bin beauty marketplace pool for fast-moving seller inventory.')
 on conflict do nothing;

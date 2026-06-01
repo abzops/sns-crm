@@ -25,8 +25,43 @@ const forceLocalMode = cfg.FORCE_LOCAL_MODE !== false;
 const hasSupabase = !forceLocalMode && Boolean(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase);
 const db = hasSupabase ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
 
-const stages = ["Prospecting", "Qualified", "Proposal", "Pilot", "Won", "Lost"];
-const stageProbability = { Prospecting: 15, Qualified: 30, Proposal: 55, Pilot: 75, Won: 100, Lost: 0 };
+const stages = [
+  "Prospecting",
+  "Lead Generation",
+  "Fit Score Eligible",
+  "Proposal",
+  "commercialization",
+  "LOI/ Pilot",
+  "WON",
+  "Lost"
+];
+const closedStages = new Set(["WON", "Lost"]);
+const stageProbability = {
+  Prospecting: 15,
+  "Lead Generation": 25,
+  "Fit Score Eligible": 40,
+  Proposal: 55,
+  commercialization: 70,
+  "LOI/ Pilot": 85,
+  WON: 100,
+  Lost: 0
+};
+const legacyStageMap = {
+  prospecting: "Prospecting",
+  qualified: "Lead Generation",
+  "lead generation": "Lead Generation",
+  "fit score": "Fit Score Eligible",
+  "fit score eligible": "Fit Score Eligible",
+  proposal: "Proposal",
+  commercialization: "commercialization",
+  commercialisation: "commercialization",
+  pilot: "LOI/ Pilot",
+  "loi/pilot": "LOI/ Pilot",
+  "loi/ pilot": "LOI/ Pilot",
+  "loi pilot": "LOI/ Pilot",
+  won: "WON",
+  lost: "Lost"
+};
 
 const state = {
   accounts: [],
@@ -144,6 +179,21 @@ function parseJsonArray(value) {
   return [];
 }
 
+function normalizeStage(rawStage) {
+  const stage = String(rawStage || "").trim();
+  if (stages.includes(stage)) return stage;
+  const key = stage.replace(/\s+/g, " ").toLowerCase();
+  return legacyStageMap[key] || "Prospecting";
+}
+
+function stageClass(stage) {
+  const slug = String(stage || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `stage-${slug || "unknown"}`;
+}
+
 function normalizeChannels(raw) {
   const arr = parseJsonArray(raw);
   if (!arr.length) return [];
@@ -158,6 +208,7 @@ function normalizeChannels(raw) {
 function normalizeAccount(row = {}) {
   const channels = normalizeChannels(row.channels);
   const competitorsServing = parseJsonArray(row.competitors_serving).map((x) => String(x));
+  const stage = normalizeStage(row.stage);
   return {
     ...row,
     id: row.id || "",
@@ -168,8 +219,8 @@ function normalizeAccount(row = {}) {
     contact_phone: row.contact_phone || "",
     owner: row.owner || "",
     city: row.city || "Bangalore",
-    stage: row.stage || "Prospecting",
-    probability: Number(row.probability ?? stageProbability[row.stage] ?? 0),
+    stage,
+    probability: Number(row.probability ?? stageProbability[stage] ?? 0),
     score: Number(row.score || row.qc_score || 0),
     qc_score: Number(row.qc_score || row.score || 0),
     deal_value: Number(row.deal_value || 0),
@@ -418,7 +469,7 @@ function applyKpiFilter(type) {
 function renderKpis() {
   const accounts = state.accounts;
   const total = accounts.length;
-  const open = accounts.filter((a) => !["Won", "Lost"].includes(a.stage));
+  const open = accounts.filter((a) => !closedStages.has(a.stage));
   const weightedForecast = open.reduce((sum, a) => sum + Number(a.deal_value || 0) * Number(a.probability || 0) / 100, 0);
   const totalWeightedMrr = accounts.reduce((sum, a) => sum + Number(a.weighted_mrr || 0), 0);
   const peakDailyDemand = accounts.reduce((sum, a) => sum + Number(a.demand_high || 0), 0);
@@ -426,7 +477,7 @@ function renderKpis() {
   const competitorRisk = accounts.filter((a) => (a.competitors_serving || []).length > 0).length;
   const clearRunway = total - competitorRisk;
   const totalBins = accounts.reduce((sum, a) => sum + Number(a.bin_slots || 0), 0);
-  const wonCount = accounts.filter((a) => a.stage === "Won").length;
+  const wonCount = accounts.filter((a) => a.stage === "WON").length;
   const approachNow = accounts.filter((a) => a.action === "Approach now").length;
   const taskCount = snsBuildTasks(accounts).length;
 
@@ -460,7 +511,7 @@ function renderStageBars() {
 
 function renderForecast() {
   const months = ["M1", "M2", "M3", "M4", "M5", "M6"];
-  const open = state.accounts.filter((a) => !["Won", "Lost"].includes(a.stage));
+  const open = state.accounts.filter((a) => !closedStages.has(a.stage));
   const weighted = open.reduce((sum, a) => sum + Number(a.deal_value || 0) * Number(a.probability || 0) / 100, 0);
   const values = months.map((_, i) => Math.round(weighted * (0.42 + i * 0.14)));
   const max = Math.max(...values, 1);
@@ -508,7 +559,7 @@ function renderTable() {
               </div>
             </div>
           </td>
-          <td><span class="pill ${escapeHtml(a.stage)}">${escapeHtml(a.stage)}</span></td>
+          <td><span class="pill ${stageClass(a.stage)}">${escapeHtml(a.stage)}</span></td>
           <td>
             <span class="tier-pill ${tierClass(a.priority_tier)}">${escapeHtml(a.priority_tier || "P2")}</span>
             <span class="action-pill">${escapeHtml(a.action || "Shortlist")}</span>
@@ -804,7 +855,7 @@ function clearAccountForm() {
 
   $("city").value = "Bangalore";
   $("stage").value = "Prospecting";
-  $("probability").value = "15";
+  $("probability").value = String(stageProbability.Prospecting);
   $("priority_tier").value = "P2";
   $("action").value = "Shortlist";
   $("score_qc_urgency").value = "3";
@@ -896,7 +947,8 @@ function fillAccountForm(record) {
   $("contact_phone").value = record.contact_phone || "";
   $("owner").value = record.owner || "";
   $("city").value = record.city || "";
-  $("stage").value = record.stage || "Prospecting";
+  const stage = normalizeStage(record.stage);
+  $("stage").value = stages.includes(stage) ? stage : "Prospecting";
   $("probability").value = String(record.probability ?? "");
   $("next_action_at").value = record.next_action_at || "";
   $("next_action").value = record.next_action || "";

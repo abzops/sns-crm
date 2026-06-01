@@ -35,11 +35,14 @@ ACTION_PROBABILITY = {
 
 STAGE_BY_STATUS = {
     "Not Started": "Prospecting",
-    "Researching": "Qualified",
-    "Email Sent": "Qualified",
-    "Meeting Booked": "Proposal",
+    "Researching": "Lead Generation",
+    "Email Sent": "Lead Generation",
+    "Meeting Booked": "Fit Score Eligible",
     "In Discussion": "Proposal",
-    "Partner Confirmed": "Won",
+    "Commercialization": "commercialization",
+    "LOI": "LOI/ Pilot",
+    "Pilot": "LOI/ Pilot",
+    "Partner Confirmed": "WON",
     "On Hold": "Lost",
 }
 
