@@ -421,11 +421,15 @@ function filteredAccounts() {
 function renderFilters() {
   const ownerSelect = $("ownerFilter");
   const stageSelect = $("stageFilter");
+  const stageQuickSelect = $("stageQuickFilter");
+  const stageInput = $("stage");
   const channelSelect = $("channelFilter");
   const pipelineOwnerSelect = $("pipelineOwnerFilter");
 
   const currentOwner = ownerSelect?.value || "all";
   const currentStage = stageSelect?.value || "all";
+  const currentQuickStage = stageQuickSelect?.value || "all";
+  const currentInputStage = stageInput?.value || "Prospecting";
   const currentChannel = channelSelect?.value || "all";
   const currentPipelineOwner = pipelineOwnerSelect?.value || "all";
 
@@ -442,6 +446,14 @@ function renderFilters() {
   if (stageSelect) {
     stageSelect.innerHTML = `<option value="all">All stages</option>${stages.map((s) => `<option value="${s}">${s}</option>`).join("")}`;
     stageSelect.value = stages.includes(currentStage) ? currentStage : "all";
+  }
+  if (stageQuickSelect) {
+    stageQuickSelect.innerHTML = `<option value="all">All stages</option>${stages.map((s) => `<option value="${s}">${s}</option>`).join("")}`;
+    stageQuickSelect.value = stages.includes(currentQuickStage) ? currentQuickStage : "all";
+  }
+  if (stageInput) {
+    stageInput.innerHTML = stages.map((s) => `<option value="${s}">${s}</option>`).join("");
+    stageInput.value = stages.includes(currentInputStage) ? currentInputStage : "Prospecting";
   }
 
   const channelNames = [
