@@ -76,6 +76,7 @@ const state = {
 let realtimeChannel = null;
 let realtimeWired = false;
 let realtimeTimer = null;
+const unsupportedAccountColumns = new Set();
 
 const STORAGE_KEYS = {
   accounts: "sns_crm_v1_accounts",
@@ -200,6 +201,43 @@ function ensureStageDropdown(value = "Prospecting") {
   const normalized = normalizeStage(value);
   stageInput.innerHTML = stages.map((s) => `<option value="${s}">${s}</option>`).join("");
   stageInput.value = stages.includes(normalized) ? normalized : "Prospecting";
+}
+
+function missingColumnFromError(error) {
+  const message = String(error?.message || "");
+  const match = message.match(/'([^']+)' column of '([^']+)' in the schema cache/i);
+  if (!match || match[2] !== tableName) return "";
+  return match[1];
+}
+
+function accountPayloadForDb(payload) {
+  const clean = { ...payload };
+  unsupportedAccountColumns.forEach((column) => {
+    delete clean[column];
+  });
+  return clean;
+}
+
+async function writeAccountToDb(payload, id = "") {
+  let cleanPayload = accountPayloadForDb(payload);
+
+  for (let attempts = 0; attempts < 8; attempts += 1) {
+    const query = id
+      ? db.from(tableName).update(cleanPayload).eq("id", id)
+      : db.from(tableName).insert(cleanPayload);
+    const { data, error } = await query.select().single();
+
+    if (!error) return data;
+
+    const missingColumn = missingColumnFromError(error);
+    if (!missingColumn || !(missingColumn in cleanPayload)) throw error;
+
+    unsupportedAccountColumns.add(missingColumn);
+    delete cleanPayload[missingColumn];
+    console.warn(`Supabase schema is missing crm_accounts.${missingColumn}; retrying save without it.`);
+  }
+
+  throw new Error("Save failed after retrying unsupported database fields.");
 }
 
 function normalizeChannels(raw) {
@@ -1121,15 +1159,8 @@ async function saveAccount(event) {
       return;
     }
 
-    if (id) {
-      const { data, error } = await db.from(tableName).update(payload).eq("id", id).select().single();
-      if (error) throw error;
-      if (!data?.id) throw new Error("Update returned no record.");
-    } else {
-      const { data, error } = await db.from(tableName).insert(payload).select().single();
-      if (error) throw error;
-      if (!data?.id) throw new Error("Insert returned no record.");
-    }
+    const saved = await writeAccountToDb(payload, id);
+    if (!saved?.id) throw new Error(id ? "Update returned no record." : "Insert returned no record.");
 
     $("accountDialog").close();
     await loadData({ silent: true, source: "write" });
